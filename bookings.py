@@ -2,11 +2,14 @@ import numpy as np
 import pandas as pd 
 import seaborn as sns
 import matplotlib.pyplot as plt
+from matplotlib import ticker
 from datetime import datetime
 
 pd.options.display.width = None
 pd.set_option('max_columns', 10)
-plt.style.use('seaborn')
+#plt.style.use('seaborn')
+sns.set_palette("pastel")
+sns.set(style='white')
 
 # 'hotel', 'is_canceled' (1-cancelled), 'lead_time' (Number of days that elapsed between the entering date of the booking into the PMS and the arrival date),
 #	'arrival_date_year',
@@ -27,14 +30,8 @@ plt.style.use('seaborn')
 
 dataf = pd.read_csv('hotel_bookings.csv')
 
-# numerical attributes
+## numerical attributes
 #print(dataf.describe().columns)
-
-#num_atr = dataf.select_dtypes(include=['int'])
-#num_atr = dataf.describe().columns
-#for col in num_atr: 
-#	plt.hist(dataf[col], alpha=0.5)
-#	plt.show()
 
 missing_data = dataf.isnull().sum()
 dataf['children'].fillna(0, inplace=True)
@@ -42,57 +39,61 @@ dataf['children'].fillna(0, inplace=True)
 country_data = dataf['country'].value_counts()
 dataf['country'].fillna("UNK", inplace=True) #unknown
 
-
-#dataf.drop(['agent', 'company'], axis=1, inplace=True)
-#categorical/non-numerical attributes
+## categorical/non-numerical attributes
 #print([x for x in dataf.columns if x not in dataf.describe().columns])
 
-#sns.countplot(x='hotel', data=dataf, hue='is_canceled', palette='pastel')
-#plt.show()
+#dataf_corr = dataf.corr()
+#print(dataf_corr['is_canceled'])
 
-dataf_corr = dataf.corr()
-
-#negative correlation so these two columns can be dropped
+## negative correlation so these two columns can be dropped
 dataf.drop(['is_repeated_guest', 'previous_bookings_not_canceled', 'required_car_parking_spaces', 'total_of_special_requests', 'booking_changes'], axis=1, inplace=True)
+dataf.drop(['agent', 'company'], axis=1, inplace=True)
 
-#put babies and children together
+## put babies and children together
 dataf['children'] = dataf['children'] + dataf['babies']
 dataf.drop(['babies'], axis=1, inplace=True)
 
+sns.countplot(x='hotel', data=dataf, hue='is_canceled', palette='pastel')
+#plt.show()
+
 dataf['stays_in_nights'] = dataf['stays_in_weekend_nights'] + dataf['stays_in_week_nights']
+
 dataf['arrival_date'] = dataf['arrival_date_day_of_month'].astype(str) + '-' + dataf['arrival_date_month'] + '-' + dataf['arrival_date_year'].astype(str)
-dataf['arrival_date'] = dataf['arrival_date'].apply(pd.to_datetime)
+dataf['arrival_date'] = dataf['arrival_date'].apply(pd.to_datetime, format='%d-%B-%Y')
 dataf.drop(['arrival_date_day_of_month', 'arrival_date_week_number', 'arrival_date_month', 'arrival_date_year'], axis=1, inplace=True)
 
-#print(dataf_corr['is_canceled'])
+dataf['reservation_status_date'] = dataf['reservation_status_date'].apply(pd.to_datetime, format='%Y-%m-%d')
 
-print(dataf.head())
+dataf['canc_to_arrival_days'] = (dataf['arrival_date'] - dataf['reservation_status_date']).dt.days
+dataf['canc_to_arrival_days'] = np.where(dataf['reservation_status'] == 'Canceled', dataf['canc_to_arrival_days'], -1)
 
-##xx = [dataf['canc_to_arrival_days'] = (dataf['arrival_date'] - dataf['reservation_status_date']) if dataf['reservation_status'] == "Canceled" else (dataf['canc_to_arrival_days'] = -1) for row in dataf]
-
-#yy = [dataf['canc_to_arrival_days'] = (dataf['arrival_date'] - dataf['reservation_status_date']) if dataf['reservation_status'] == 'Canceled' for row in dataf]
-
-#dataf['reservation_status_date'] = datetime.strptime(dataf['reservation_status_date'], '%Y-%m-%d')
-dataf['reservation_status_date'] = pd.to_datetime(dataf['reservation_status_date'], format='%Y-%m-%d')
-#for row in dataf['reservation_status']:
-	#if row == 'Canceled':
-		#dataf['canc_to_arrival_days'] = (dataf['arrival_date'] - dataf['reservation_status_date'])
-		#print(dataf['canc_to_arrival_days'])
-	#else:
-	#	dataf['canc_to_arrival_days'] = 0
-print(dataf['canc_to_arrival_days'].describe())
-
-dataf['canc_to_arrival_days'] = np.where(dataf['reservation_status'] == 'Canceled', (dataf['arrival_date'] - dataf['reservation_status_date']), 0)
-#print(dataf['canc_to_arrival_days'])
-print(dataf['canc_to_arrival_days'].describe())
-
-#cancelled_data['canc_to_arrival_days'] = cancelled_data['arrival_date'] - cancelled_data['reservation_status_date']
-
-#sns.set_palette("pastel")
-#ax = sns.displot(dataf['lead_time'], bins=np.arange(0,dataf['lead_time'].max(),50), kde=False, height=4, aspect=2)
-#ax.set(xlabel="lead time to the arrival date")
+ax = sns.displot(dataf['lead_time'], bins=np.arange(0,dataf['lead_time'].max(),50), kde=False, height=4, aspect=2)
+ax.set(xlabel="lead time to the arrival date")
 #plt.show()
 
-#sns.countplot(x='customer_type', data=dataf, hue='is_canceled')
+tempdf = dataf[dataf['canc_to_arrival_days'] != -1]
+
+ax = sns.displot(tempdf['canc_to_arrival_days'], kde=True, color="purple", height=4, aspect=2)
+ax.set(xlabel="days between cancellation and booked date", ylabel=" ")
+plt.xlim(xmin=0)
 #plt.show()
 
+#print(dataf.columns.values)
+#print(dataf['market_segment'].count)
+#print(tempdf['market_segment'].count)
+
+#for discrete values - months
+months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+g = sns.countplot(x=dataf['arrival_date'].dt.month, data=dataf, palette='pastel')
+g.set_xticklabels(months)
+plt.title('number of cancellations in each of the months')
+plt.xticks(rotation = 90)
+#plt.show()
+
+
+## for market segment
+# Count Plot (a.k.a. Bar Plot)
+sns.countplot(x='Type 1', data=df, palette=pkmn_type_colors)
+ 
+# Rotate x-labels
+plt.xticks(rotation=-45)
