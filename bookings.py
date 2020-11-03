@@ -91,8 +91,6 @@ plt.xticks(rotation = 90)
 #plt.show()
 
 
-## for market segment
-# Count Plot (a.k.a. Bar Plot)
 sns.countplot(x=dataf['market_segment'], data=dataf, palette='pastel')
 plt.xticks(rotation=-45)
 plt.show()
